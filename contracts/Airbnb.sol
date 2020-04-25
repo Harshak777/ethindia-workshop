@@ -1,7 +1,20 @@
-pragma solidity ^0.5.7;
+pragma solidity ^0.6.4;
 
 contract Airbnb {
   // INSERT struct Property
+  struct Property {
+  string name;
+  string description;
+  bool isActive; // is property active
+  uint256 price; // per day price in wei (1 ether = 10^18 wei)
+  address owner; // Owner of the property
+
+  // Is the property booked on a particular day,
+  // For the sake of simplicity, we assign 0 to Jan 1, 1 to Jan 2 and so on
+  // so isBooked[31] will denote whether the property is booked for Feb 1
+  bool[] isBooked;
+}
+
 
   // Unique and sequential propertyId for every new property
   uint256 public propertyId;
@@ -10,6 +23,14 @@ contract Airbnb {
   mapping(uint256 => Property) public properties;
 
   // INSERT struct Booking
+struct Booking {
+  uint256 propertyId;
+  uint256 checkInDate;
+  uint256 checkoutDate;
+  address user;
+}
+
+
 
   uint256 public bookingId;
 
@@ -33,13 +54,15 @@ contract Airbnb {
     * @param description Short description of your property
     * @param price Price per day in wei (1 ether = 10^18 wei)
     */
-  function rentOutproperty(string memory name, string memory description, uint256 price) public {
-    // create a property object
+function rentOutproperty(string memory name, string memory description, uint256 price) public {
+    Property memory property = Property(name, description, true /* isActive */, price, msg.sender /* owner */, new bool[](365));
 
     // Persist `property` object to the "permanent" storage
+    properties[propertyId] = property;
 
     // emit an event to notify the clients
-  }
+    emit NewProperty(propertyId++);
+}
 
   /**
    * @dev Make an Airbnb booking
@@ -47,21 +70,24 @@ contract Airbnb {
    * @param checkInDate Check-in date
    * @param checkoutDate Check-out date
    */
-  function rentProperty(uint256 _propertyId, uint256 checkInDate, uint256 checkoutDate) public payable {
+function rentProperty(uint256 _propertyId, uint256 checkInDate, uint256 checkoutDate) public payable {
     // Retrieve `property` object from the storage
+    Property storage property = properties[_propertyId];
 
     // Assert that property is active
+    require(
+      property.isActive == true,
+      "property with this ID is not active"
+    );
 
     // Assert that property is available for the dates
-
-    // Check the customer has sent an amount equal to (pricePerDay * numberOfDays)
-
-    // send funds to the owner of the property
-    _sendFunds(property.owner, msg.value);
-
-    // conditions for a booking are satisfied, so make the booking
-    _createBooking(_propertyId, checkInDate, checkoutDate);
-  }
+    for (uint256 i = checkInDate; i < checkoutDate; i++) {
+      if (property.isBooked[i] == true) {
+        // if property is booked on a day, revert the transaction
+        revert("property is not available for the selected dates");
+      }
+}
+}
 
   function _sendFunds (address beneficiary, uint256 value) internal {
     // address(uint160()) is a weird solidity quirk
@@ -69,17 +95,21 @@ contract Airbnb {
     address(uint160(beneficiary)).transfer(value);
   }
 
-  function _createBooking(uint256 _propertyId, uint256 checkInDate, uint256 checkoutDate) internal {
-    // Create a new booking object
+function _createBooking(uint256 _propertyId, uint256 checkInDate, uint256 checkoutDate) internal {
+// Create a new booking object
+bookings[bookingId] = Booking(_propertyId, checkInDate, checkoutDate, msg.sender);
 
-    // persist to storage
+// Retrieve `property` object from the storage
+Property storage property = properties[_propertyId];
 
-    // Retrieve `property` object from the storage
+// Mark the property booked on the requested dates
+for (uint256 i = checkInDate; i < checkoutDate; i++) {
+  property.isBooked[i] = true;
+}
 
-    // Mark the property booked on the requested dates
-
-    // Emit an event to notify clients
-  }
+// Emit an event to notify clients
+emit NewBooking(_propertyId, bookingId++);
+}
 
   /**
    * @dev Take down the property from the market

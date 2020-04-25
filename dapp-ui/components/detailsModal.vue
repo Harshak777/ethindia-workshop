@@ -55,6 +55,14 @@ export default {
     },
     book() {
       // get Start date
+  // get Start date
+  const startDay = this.getDayOfYear(this.startDate)
+  // get End date
+  const endDay = this.getDayOfYear(this.endDate)
+  // price calculation
+  const totalPrice = web3().utils.toWei(this.propData.price, 'ether') * (endDay - startDay)
+  // call utils.bookProperty
+  bookProperty(this.propData.id, startDay, endDay, totalPrice)
 
       // get End date
 
